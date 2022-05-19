@@ -26,7 +26,7 @@ import VueJwtDecode from "vue-jwt-decode";
 import io from "socket.io-client";
 import { Environments } from './environments'
 
-const currentEnv = Environments.dev
+const currentEnv = Environments.bgu
 
 Vue.use(VueQuill)
 Vue.use(VTooltip)
