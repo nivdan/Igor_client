@@ -152,11 +152,13 @@ function embedNbApp() {
                     :threads-hovered="threadsHovered"
                     :draft-range="draftRange"
                     :show-highlights="showHighlights"
+                    :heatmapMode="heatmapMode"
                     :user="user"
                     :activeClass="activeClass"
                     :current-configs="currentConfigs"
                     :show-sync-features="showSyncFeatures"
                     :is-innotation-hover="isInnotationHover"
+                    :hashtags="hashtags"
                     @log-nb="onLogNb"
                     @select-thread="onSelectThread"
                     @unselect-thread="onUnselectThread"
@@ -204,6 +206,7 @@ function embedNbApp() {
                     :threads-hovered="threadsHovered"
                     :draft-range="draftRange"
                     :show-highlights="showHighlights"
+                    :heatmapMode="heatmapMode"
                     :source-url="sourceURL"
                     :current-configs="currentConfigs"
                     :is-dragging="isDragging"
@@ -230,6 +233,7 @@ function embedNbApp() {
                     @search-text="onSearchText"
                     @filter-bookmarks="onFilterBookmarks"
                     @filter-hashtags="onFilterHashtags"
+                    @filter-threads-without-emojis="onFilterThreadsWithoutEmojis"
                     @filter-user-tags="onFilterUserTags"
                     @filter-comments="onFilterComments"
                     @filter-reply-reqs="onFilterReplyReqs"
@@ -247,6 +251,7 @@ function embedNbApp() {
                     @hover-thread="onHoverThread"
                     @unhover-thread="onUnhoverThread"
                     @delete-thread="onDeleteThread"
+                    @change-heatmap-mode="changeHeatmapMode"
                     @new-thread="onNewThread"
                     @cancel-draft="onCancelDraft"
                     @editor-empty="onEditorEmpty"
@@ -278,6 +283,8 @@ function embedNbApp() {
                 searchOption: 'text',
                 searchText: '',
                 bookmarks: false,
+                threadsWithoutEmojis: true,
+                startFilter: false,
                 hashtags: [],
                 userTags: [],
                 comments: [],
@@ -293,6 +300,7 @@ function embedNbApp() {
                 maxThreads: null,
             },
             showHighlights: true,
+            heatmapMode: "Default",
             sourceURL: '',
             threadViewInitiator: 'NONE', // what triggered the thread view open ['NONE', 'LIST', 'HIGHLIGHT', 'SPOTLIGHT']
             nbConfigs: {},
@@ -378,12 +386,18 @@ function embedNbApp() {
                     items = items.filter(item => item.hasBookmarks())
                 }
                 let filterHashtags = this.filter.hashtags
-                if (filterHashtags.length > 0) {
+                if (this.filter.startFilter) {
                     items = items.filter(item => {
+                        if (item.hashtags.length == 0) return true
                         for (let hashtag of filterHashtags) {
                             if (item.hasHashtag(hashtag)) return true
                         }
                         return false
+                    })
+                }
+                if (!this.filter.threadsWithoutEmojis) {
+                    items = items.filter(item => {
+                        return item.hashtags.length != 0
                     })
                 }
                 let filterUserTags = this.filter.userTags
@@ -929,6 +943,9 @@ function embedNbApp() {
                     axios.delete(`/api/annotations/annotation/${thread.id}`, headers)
                 }
             },
+            changeHeatmapMode: function (mode) {
+                this.heatmapMode = mode
+            },
             onNewThread: function (thread) {
                 this.threads.push(thread)
                 this.draftRange = null
@@ -977,6 +994,12 @@ function embedNbApp() {
                     }
                 }
                 this.filter.hashtags = hashtags
+            },
+            onFilterThreadsWithoutEmojis: function (flag) {
+                if(this.threadSelected && this.threadSelected.hashtags.length == 0 && !flag) {
+                    this.threadSelected = null
+                }
+                this.filter.threadsWithoutEmojis = flag
             },
             onFilterUserTags: function (filters) {
                 if (this.threadSelected && filters.includes('me') && !this.threadSelected.hasUserTag(this.user.id)) {

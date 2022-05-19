@@ -30,6 +30,7 @@
             @search-text="onSearchText"
             @filter-bookmarks="onFilterBookmarks"
             @filter-hashtags="onFilterHashtags"
+            @filter-threads-without-emojis="onFilterThreadsWithoutEmojis"
             @filter-user-tags="onFilterUserTags"
             @filter-comments="onFilterComments"
             @filter-reply-reqs="onFilterReplyReqs"
@@ -43,12 +44,19 @@
             @min-reply-reqs="onMinReplyReqs"
             @min-upvotes="onMinUpvotes">
         </filter-view>
+        <div class="buttons">
+          <span>Heatmap modes:</span>
+          <button class="default" @click="setHeatmapMode('Default')">Default</button>
+          <button class="emoji" @click="setHeatmapMode('Emoji')" :disabled="isEditorEmpty">Emoji</button>
+          <button class="CE" @click="setHeatmapMode('CE')" :disabled="isEditorEmpty">CE</button>
+        </div>
         <list-view
             :threads="threads"
             :total-count="totalThreads"
             :thread-selected="threadSelected"
             :threads-hovered="threadsHovered"
             :show-highlights="showHighlights"
+            :heatmapMode="heatmapMode"
             :still-gathering-threads="stillGatheringThreads"
             :current-configs="currentConfigs"
             :activeClass="activeClass"
@@ -98,6 +106,27 @@
             @prev-comment="onPrevComment"
             @next-comment="onNextComment">
         </thread-view>
+        <div v-if="showParagraphStatistics">
+            <button class="Hide-paragraph-statistics" 
+                    @click="toggleParagraphStatistics">
+                    Hide paragraph statistics
+            </button>
+        </div>
+        <div v-else>
+            <button class="Show-paragraph-statistics" 
+                    @click="toggleParagraphStatistics">
+                    Show paragraph statistics
+            </button>
+        </div>
+        <template>
+            <div class="home">
+                <BarChart
+                v-if="showParagraphStatistics"
+                class="chart"
+                :chartData="chartData"
+                />
+            </div>
+        </template>
         <editor-view
             :author="user"
             :key="editor.key"
@@ -136,6 +165,7 @@ import ThreadView from './thread/ThreadView.vue'
 import EditorView from './editor/EditorView.vue'
 import NbMenu from './NbMenu.vue'
 import NbOnline from './NbOnline.vue'
+import BarChart from "./BarChart.vue"
 
 Vue.use(Notifications)
 
@@ -196,6 +226,10 @@ export default {
             type: Boolean,
             default: true
         },
+        heatmapMode: {
+            type: String,
+            default: "Default"
+        },
         sourceUrl: {
             type: String,
             default: ""
@@ -231,9 +265,21 @@ export default {
         filter: {
             type: Object,
             default: () => {}
+        },
+        chartData: {
+            type: Object,
+            default:() => {}
+        },
+        showParagraphStatistics: {
+            type: Boolean,
+            default:false
         }
     },
     data () {
+        this.chartData ={
+        labels: [],
+        datasets: []
+      }
         return {
             replyToComment: null,
             edittingComment: null,
@@ -277,6 +323,33 @@ export default {
     watch: {
         draftRange: function (val, oldVal) {
             if (val) {
+                var statDict = {
+                        "#i-think" : 0,
+                        "#interesting-topic" : 0,
+                        "#learning-goal" : 0,
+                        "#lightbulb-moment" : 0,
+                        "#needs-work" : 0,
+                        "#real-world-application" : 0,
+                        "#important" : 0,
+                        "#just-curious" : 0,
+                        "#lets-discuss" : 0,
+                        "#lost" : 0,
+                        "#question" : 0,
+                        "#surprised" : 0,
+                }
+                for(let thread of this.threads){
+                    if(thread.range.start.wholeText === val.start.wholeText){
+                        for(var emoji in statDict){
+                            if(thread.text.includes(emoji)){
+                                statDict[emoji]++
+                            }
+                        }
+                    }
+                }
+                this.chartData = {
+                    labels: Object.keys(statDict),
+                    datasets:[{data: Object.values(statDict), label: 'Count', backgroundColor: '#f87979',}]
+                }
                 if (this.replyToComment || this.edittingComment) {
                     alert("You're already working on another comment. Please save or cancel it first.")
                     this.$emit('cancel-draft', this.draftRange)
@@ -331,6 +404,9 @@ export default {
         },
         onFilterHashtags: function (hashtags) {
             this.$emit('filter-hashtags', hashtags)
+        },
+        onFilterThreadsWithoutEmojis: function (show) {
+            this.$emit('filter-threads-without-emojis', show)
         },
         onFilterUserTags: function (filters) {
             this.$emit('filter-user-tags', filters)
@@ -399,6 +475,12 @@ export default {
             } else { // head of thread
                 this.$emit('delete-thread', comment)
             }
+        },
+        setHeatmapMode: function (mode) {
+            this.$emit('change-heatmap-mode', mode)
+        },
+        toggleParagraphStatistics: function () {
+            this.showParagraphStatistics = !this.showParagraphStatistics
         },
         onDraftReply: function (comment) {
             if (this.draftRange || this.edittingComment) {
@@ -564,6 +646,7 @@ export default {
         NbMenu,
         NotificationView,
         NbOnline,
+        BarChart
     }
 }
 </script>
